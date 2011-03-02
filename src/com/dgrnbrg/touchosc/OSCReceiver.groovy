@@ -33,9 +33,9 @@ class OSCReceiver {
         assert false
     }
     listeners.each { path, closure ->
-      def pattern = ~path
       packets.each { packet ->
-        if (pattern.matcher(packet.address).matches()) {
+        println "checking if $packet.address starts with $path"
+        if (packet.address.startsWith(path)) {
           closure(timestamp, packet)
         }
       }
