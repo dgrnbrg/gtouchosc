@@ -1,0 +1,31 @@
+includeTargets << gant.targets.Clean
+cleanPattern << [ '**/*.class' ]
+cleanDirectory << 'classes'
+
+taskdef(name: "groovyc", classname: "org.codehaus.groovy.ant.Groovyc")
+
+target(compile: 'build the code') {
+  depends(init)
+  groovyc(srcdir: 'src', destdir: 'classes', stacktrace: true) {
+    classpath {
+      fileset(dir: 'lib', includes: '**/*.jar')
+    }
+    javac(debug: 'on')
+  }
+}
+
+target(init: 'setup the directories') {
+  mkdir(dir:'classes')
+}
+
+target(run: 'execute the server') {
+  depends(compile)
+  java(classname: 'com.dgrnbrg.touchosc.GTouchOSC', fork: true) {
+    classpath {
+      pathelement(path: 'classes')
+      fileset(dir: 'lib', includes: '**/*.jar')
+    }
+  }
+}
+
+setDefaultTarget(run)
