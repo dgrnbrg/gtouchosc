@@ -31,7 +31,7 @@ class GroovyLayoutServerHelper extends NanoHTTPD {
     super(9658);
   }
 
-  public NanoHTTPD.Response serve(String uri, String method, Properties header, Properties parms)
+  public NanoHTTPD.Response serve(String uri, String method, Properties header, Properties parms, Properties files)
   {
     println "sending data: $xmlString"
     NanoHTTPD.Response r = new NanoHTTPD.Response(this, "200 OK", "application/touchosc", xmlString)

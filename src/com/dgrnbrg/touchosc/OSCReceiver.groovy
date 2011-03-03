@@ -34,7 +34,6 @@ class OSCReceiver {
     }
     listeners.each { path, closure ->
       packets.each { packet ->
-        println "checking if $packet.address starts with $path"
         if (packet.address.startsWith(path)) {
           closure(timestamp, packet)
         }

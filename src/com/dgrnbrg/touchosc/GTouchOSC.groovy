@@ -6,41 +6,39 @@ class GTouchOSC {
   static void main(args) {
     def receiver = new OSCReceiver()
     def b = new TouchOSCLayoutBuilder(receiver: receiver)
-    b.build(Device.IPOD, Orientation.VERT){ 
+    b.build(Device.IPOD, Orientation.HORIZ){
       tab {
         span(orient: Orientation.VERT) {
           spacer()
           span {
             label(text: 'hello, david!')
-            push(color: 'yellow', bind: {time, msg -> println "push: $msg.arguments"})
+            push(color: 'yellow', bind: {pushed -> println "push: $pushed"})
             led(color: 'blue')
             toggle(color: 'blue')
           }
           span {
             fader(orient: Orientation.VERT)
             rotary(orient: Orientation.VERT)
-            xy()
           }
           span {
-            multifader(8, orient: Orientation.VERT)
-            multitoggle(8,8, bind: {time,msg -> println "mt: $msg.arguments"})
+            multifader(8, orient: Orientation.VERT, bind: {i, v -> println "multifader $i $v"})
+            multitoggle(8,8, bind: {x, y, pushed -> println "mt: $x $y $pushed"})
           }
         }
       }
       tab {
         span(orient: Orientation.VERT) {
           multifader(4, fill: 0.3)
-          multitoggle(16,16)
+//          multitoggle(16,16)
+            xy(bind: {x,y -> println "xy: $x $y"})
         }
       }
     }
 
-    def c = new TouchOSCLayoutBuilder()
-    c.build(Device.IPOD, Orientation.VERT){
-      span{ push(); rotary() }
-    }
+//    receiver.addListener('/') {time,msg -> println "$msg.address: $msg.arguments"}
+
     net.hexler.touchosc.zeroconf.ZeroConfManager zcm = new net.hexler.touchosc.zeroconf.ZeroConfManager()
-    def ls = new GroovyLayoutServer(xmlString: b.getLayoutXML(), name: "Test.touchosc")
+    def ls = new GroovyLayoutServer(xmlString: b.getLayoutXML(), name: "bar.touchosc")
     ls.startService()
     receiver.startListening()
 

@@ -20,6 +20,7 @@ class TouchOSCLayoutBuilder {
   def receiver
   def phase = BuilderPhase.TAB
   def hasTabs = false
+  def orientation
 
   //size in pixels of various things we need for computing the layout
   static def touchOSCBar = 40
@@ -35,6 +36,8 @@ class TouchOSCLayoutBuilder {
   void build(Device device, Orientation orient, Closure c) {
     def correctMode = [(Device.IPOD): 0, (Device.IPAD): 1, (Device.IPHONE): 0][device]
     def correctOrientation = [(Orientation.VERT): 'horizontal', (Orientation.HORIZ): 'vertical'][orient]
+
+    orientation = orient
 
     def dim
     switch (device) {
@@ -91,7 +94,6 @@ class TouchOSCLayoutBuilder {
   }
 
   def doRealLayoutHelper(hierarchy, int width, int height, int hoff, int voff) {
-    println hierarchy
     if (hierarchy.spanControls != null) {
       //it's a span
       def pos = hierarchy.orient == Orientation.HORIZ ? hoff : voff
@@ -113,11 +115,25 @@ class TouchOSCLayoutBuilder {
     } else {
       //it's a control
       if (hierarchy.ignore) return
-      hierarchy.w = width - 2*padding
-      hierarchy.h = height - 2*padding
-      hierarchy.x = hoff + padding
-      hierarchy.y = voff + padding
+      switch (orientation) {
+      case Orientation.VERT:
+        hierarchy.w = width - 2*padding
+        hierarchy.h = height - 2*padding
+        hierarchy.x = hoff + padding
+        hierarchy.y = voff + padding
+        break
+      case Orientation.HORIZ:
+        hierarchy.h = width - 2*padding
+        hierarchy.w = height - 2*padding
+        hierarchy.y = hoff + padding
+        hierarchy.x = this.height - (voff + height - padding)
+        break
+      default:
+        assert false
+      }
       hierarchy.remove('fill')
+      hierarchy.remove('bind')
+      hierarchy.remove('bindReal')
       mb.control(hierarchy)
     }
   }
@@ -129,8 +145,6 @@ class TouchOSCLayoutBuilder {
 
     def argMap = args.find{it instanceof Map} ?: [:]
     def okKeysList = ['fill', 'osc_cs', 'ignore']
-    if (receiver != null)
-      okKeysList << 'bind'
     def argClosure = args.find{it instanceof Closure} ?: {->}
 
     //default params related fixers
@@ -140,7 +154,7 @@ class TouchOSCLayoutBuilder {
       argMap = defaults
     }
     def fixOriented = { ->
-      defaultify([orient: Orientation.HORIZ])
+      defaultify([orient: orientation == Orientation.HORIZ ? Orientation.VERT : Orientation.HORIZ])
       argMap.type = "$argMap.type${argMap.orient == Orientation.HORIZ ? 'h' : 'v'}"
     }
     def fixScale = {->
@@ -148,7 +162,7 @@ class TouchOSCLayoutBuilder {
     }
     def fixBasics = {->
       defaultify([type: name])
-      defaultify([name: "$argMap.type${countup()}", color: 'red'])
+      defaultify([name: "$argMap.type${countup()}".toString(), color: 'red'])
     }
     def fixLocal = {->
       defaultify([local_off: false])
@@ -168,6 +182,14 @@ class TouchOSCLayoutBuilder {
       defaultify([centered: false])
     }
 
+    def handleBinding = { Closure wrapper ->
+      if (receiver != null)
+        okKeysList += ['bind', 'bindReal']
+      if (argMap.bind != null) {
+        argMap.bindReal = wrapper.curry(argMap.bind)
+      }
+    }
+
     //adds current item to build hierarchy
     def pushSpan = {->
       if (phase == BuilderPhase.TAB) {
@@ -181,7 +203,7 @@ class TouchOSCLayoutBuilder {
       }
     }
 
-    defaultify([osc_cs: "/addr${countup()}"])
+    defaultify([osc_cs: "/addr${countup()}".toString()])
 
     switch (name) {
     case 'span':
@@ -213,12 +235,16 @@ class TouchOSCLayoutBuilder {
       fixLocal()
       fixScale()
       pushSpan()
+      //true/false on press/release
+      handleBinding { binding, time, msg -> binding(msg.arguments[0] == 1) }
       break
     case 'toggle':
       fixBasics()
       fixLocal()
       fixScale()
       pushSpan()
+      //true/false on press/release
+      handleBinding { binding, time, msg -> binding(msg.arguments[0] == 1) }
       break
     case 'xy':
       fixBasics()
@@ -226,14 +252,20 @@ class TouchOSCLayoutBuilder {
       fixInvert('xy')
       fixLocal()
       pushSpan()
+      //gives x/y coords
+      handleBinding { binding, time, msg -> binding(msg.arguments[0], msg.arguments[1]) }
       break
     case 'fader':
       fixSlide()
       pushSpan()
+      //gives value
+      handleBinding { binding, time, msg -> binding(msg.arguments[0]) }
       break
     case 'rotary':
       fixSlide()
       pushSpan()
+      //gives value
+      handleBinding { binding, time, msg -> binding(msg.arguments[0]) }
       break
     case 'multifader':
       args = args as List
@@ -247,6 +279,12 @@ class TouchOSCLayoutBuilder {
       defaultify(number: numArg)
       fixSlide()
       pushSpan()
+      //gives index and value
+      handleBinding { binding, time, msg ->
+        def matcher = msg.address =~ '/\\p{Alnum}+/([0-9])+'
+        assert matcher.matches()
+        binding(matcher.group(1) as Integer, msg.arguments[0])
+      }
       break
     case 'multitoggle':
       args = args as List
@@ -263,6 +301,12 @@ class TouchOSCLayoutBuilder {
       fixScale()
       fixLocal()
       pushSpan()
+      //gives index and pushed or not
+      handleBinding { binding, time, msg ->
+        def matcher = msg.address =~ '/\\p{Alnum}+/([0-9])+/([0-9])+'
+        assert matcher.matches()
+        binding(matcher.group(1) as Integer, matcher.group(2) as Integer, msg.arguments[0] == 1)
+      }
       break
     case 'led':
       fixBasics()
@@ -289,9 +333,9 @@ class TouchOSCLayoutBuilder {
       throw new RuntimeException("Unknown command: $name")
     }
 
-    if (receiver != null && argMap.bind != null) {
+    if (receiver != null && argMap.bindReal != null) {
       //listen for the osc_cs path or any subpath
-      receiver.addListener(argMap.osc_cs+'(/.*)?', argMap.bind)
+      receiver.addListener(argMap.osc_cs, argMap.bindReal)
     }
 
     def extraKeys = argMap.keySet() - okKeysList
