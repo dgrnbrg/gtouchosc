@@ -169,16 +169,16 @@ class TouchOSCLayoutBuilder {
     }
     def fixInvert = {
       if (it == 'xy') {
-        defaultify([inverted_x: true, inverted_y: false])
+        defaultify([inverted_x: true, inverted_y: true])
       } else {
-        defaultify([inverted: true])
+        defaultify([inverted: false])
       }
     }
     def fixSlide = { ->
       fixBasics()
       fixScale()
-      fixOriented()
       fixInvert()
+      fixOriented() //must come last
       defaultify([centered: false])
     }
 
@@ -253,7 +253,12 @@ class TouchOSCLayoutBuilder {
       fixLocal()
       pushSpan()
       //gives x/y coords
-      handleBinding { binding, time, msg -> binding(msg.arguments[0], msg.arguments[1]) }
+      handleBinding { binding, time, msg ->
+        binding(
+          orientation == Orientation.VERT ? 1.0 - msg.arguments[0] : msg.arguments[1],
+          orientation == Orientation.VERT ? 1.0 - msg.arguments[1] : 1.0 - msg.arguments[0]
+        )
+      }
       break
     case 'fader':
       fixSlide()
