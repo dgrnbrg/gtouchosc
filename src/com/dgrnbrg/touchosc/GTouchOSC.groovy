@@ -6,6 +6,21 @@ class GTouchOSC {
   static void main(args) {
     def receiver = new OSCReceiver()
     def b = new TouchOSCLayoutBuilder(receiver: receiver)
+    b.build(Device.IPOD, Orientation.VERT) {
+      tab {
+        span (orient: Orientation.VERT) {
+          push(fill: 0.3, bind: { pressed -> println "pushed button $pressed" })
+          span {
+            xy(fill: 0.8, bind: {x,y -> println "xy $x $y" })
+            label(orient: Orientation.VERT, text: "Hello Alec!")
+          }
+        }
+      }
+      tab {
+        span{toggle(bind: {pressed -> println "toggle $pressed"})}
+      }
+    }
+/*
     b.build(Device.IPOD, Orientation.HORIZ){
       tab {
         span(orient: Orientation.VERT) {
@@ -34,6 +49,7 @@ class GTouchOSC {
         }
       }
     }
+*/
 
 //    receiver.addListener('/') {time,msg -> println "$msg.address: $msg.arguments"}
 
